@@ -34,7 +34,7 @@ async function probeWindowsRemote(ssh, explicitHermesPath = '') {
     '}',
     '}',
     `$explicit=${explicit}`,
-    'if($explicit){Assert-NoReparse $explicit $false;$explicitPython=[IO.Path]::Combine([IO.Path]::GetDirectoryName($explicit), "python.exe");Assert-NoReparse $explicitPython $false}',
+    'if($explicit){Assert-NoReparse $explicit $false;$explicitPython=[IO.Path]::Combine([IO.Path]::GetDirectoryName($explicit), "python.exe");Assert-NoReparse $explicitPython $true}',
     // HERMES_HOME is only trusted when it names a directory on the REMOTE: a stale User-scope
     // value (older install.ps1 persisted one) or a client path leaked over SSH otherwise fails
     // assertSafeRemoteHome as "Unsafe remote Hermes home" (#118988).
@@ -57,9 +57,11 @@ async function probeWindowsRemote(ssh, explicitHermesPath = '') {
     'if($cmd){Assert-NoReparse $cmd.Source $true;$cmdPython=[IO.Path]::Combine([IO.Path]::GetDirectoryName($cmd.Source), "python.exe");Assert-NoReparse $cmdPython $true;$candidates+=$cmd.Source}',
     '$candidates+=$fallbackHomeCandidate',
     '$candidates+=$fallbackProfileCandidate',
+    '$explicitHermesExists=[bool]$explicit',
+    '$explicitHasPython=$explicitPython -and (Test-Path -LiteralPath $explicitPython -PathType Leaf)',
     '$runtime=$null',
     'foreach($candidate in $candidates){$candidatePython=[IO.Path]::Combine([IO.Path]::GetDirectoryName($candidate), "python.exe");Assert-NoReparse $candidate $true;Assert-NoReparse $candidatePython $true;try{$hermesItem=Get-Item -LiteralPath $candidate -Force -ErrorAction Stop;$pythonItem=Get-Item -LiteralPath $candidatePython -Force -ErrorAction Stop;if(($hermesItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0 -and -not $hermesItem.PSIsContainer -and ($pythonItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0 -and -not $pythonItem.PSIsContainer){$runtime=[pscustomobject]@{hermes=$hermesItem.FullName;python=$pythonItem.FullName};break}}catch [Management.Automation.ItemNotFoundException]{continue}}',
-    'if(-not $runtime){throw "Hermes and its Python runtime were not found on the remote Windows host."}',
+    'if(-not $runtime){if($explicitHermesExists -and -not $explicitHasPython){throw "The configured Hermes path was found, but its sibling python.exe was not found."};throw "Hermes and its Python runtime were not found on the remote Windows host."}',
     '$hermes=$runtime.hermes',
     '$python=$runtime.python',
     'Assert-NoReparse $hermes $false',
