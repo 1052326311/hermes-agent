@@ -298,23 +298,32 @@ class SessionCompressionMixin:
         return _cooldown_row(False, None, None) if row is None else _cooldown_row(True, row[0], row[1])
 
     def restore_compression_failure_cooldown_row(self, session_id: str, snapshot: Dict[str, Any]) -> None:
-        """Restore and verify an exact cooldown-row snapshot. Unlike record/clear this
-        rollback API propagates write and verification failures: cancellation must not be
-        reported mutation-free when compensation failed."""
+        """Restore and verify an exact cooldown-row snapshot.
+
+        Propagate write and verification failures, except when a concurrently
+        deleted session no longer needs cooldown compensation.
+        """
         if not snapshot.get("session_exists", False):
             if self.get_compression_failure_cooldown_row(session_id).get("session_exists", False):
                 raise RuntimeError("cannot restore absent compression cooldown row: session now exists")
             return
         deadline = snapshot.get("cooldown_until")
         error = snapshot.get("error")
-        def _do(conn):
+        def _do(conn) -> bool:
             cursor = conn.execute(
                 "UPDATE sessions SET compression_failure_cooldown_until = ?, "
                 "compression_failure_error = ? WHERE id = ?", (deadline, error, session_id))
+            if cursor.rowcount == 0:
+                return False
             if cursor.rowcount != 1:
-                raise RuntimeError(f"compression cooldown rollback session missing: {session_id}")
-        self._execute_write(_do)
+                raise RuntimeError(f"compression cooldown rollback row count: {cursor.rowcount}")
+            return True
+        restored = self._execute_write(_do)
+        if not restored:
+            return
         actual = self.get_compression_failure_cooldown_row(session_id)
+        if not actual["session_exists"]:
+            return
         expected = _cooldown_row(True, deadline, error)
         if actual != expected:
             raise RuntimeError(
