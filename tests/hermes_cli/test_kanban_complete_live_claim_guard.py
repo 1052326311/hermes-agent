@@ -101,6 +101,27 @@ def test_ttl_claim_preserves_expected_run_id_cas(conn):
     assert kb.complete_task(conn, tid, result="done", expected_run_id=claimed.current_run_id)
 
 
+def test_worker_heartbeat_renews_the_current_run_claim(conn):
+    """A current worker heartbeat extends both the task and its run claim TTL."""
+    tid, run_id = _claimed_running_task(conn)
+    conn.execute("UPDATE tasks SET claim_expires = 1 WHERE id = ?", (tid,))
+    conn.execute("UPDATE task_runs SET claim_expires = 1 WHERE id = ?", (run_id,))
+
+    assert kbd.heartbeat_worker(conn, tid, note="still working", expected_run_id=run_id)
+
+    task = kb.get_task(conn, tid)
+    run = conn.execute(
+        "SELECT claim_expires, last_heartbeat_at FROM task_runs WHERE id = ?",
+        (run_id,),
+    ).fetchone()
+    assert task is not None
+    assert run is not None
+    assert task.claim_expires is not None and task.claim_expires > 1
+    assert task.last_heartbeat_at is not None
+    assert run["claim_expires"] == task.claim_expires
+    assert run["last_heartbeat_at"] == task.last_heartbeat_at
+
+
 def test_expired_ttl_claim_is_manually_completable(conn):
     """TTL-only protection ends at expiry; no worker process needs recovery."""
     tid = kb.create_task(conn, title="expired", assignee="operator")
