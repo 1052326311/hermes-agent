@@ -728,6 +728,10 @@ def _resolve_anthropic_pool_token(*, skip_borrowed: bool = False) -> Optional[st
     except Exception:
         logger.debug("Failed to read Anthropic credential_pool", exc_info=True)
         return None
+    from agent.credential_pool import PooledCredential, _exhausted_until
+
+    # Match the pool's rotation count without loading or mutating auth state.
+    sole_credential = sum(entry.get("last_status") != "dead" for entry in entries) <= 1
     for entry in entries:
         source = str(entry.get("source") or "")
         if skip_borrowed and source == "claude_code":
@@ -739,6 +743,12 @@ def _resolve_anthropic_pool_token(*, skip_borrowed: bool = False) -> Optional[st
             continue
         if entry.get("last_status") == "dead":
             continue
+        if entry.get("last_status") == "exhausted":
+            exhausted_until = _exhausted_until(
+                PooledCredential.from_dict("anthropic", entry), sole_credential=sole_credential,
+            )
+            if exhausted_until is not None and time.time() < exhausted_until:
+                continue
         # load_pool() re-seeds rows from the singleton files, so a spent-but-uncommitted rotation
         # (possibly from another process) looks healthy here.
         entry_source_path = spent_rotation_source_path(source)

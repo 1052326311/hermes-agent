@@ -365,6 +365,53 @@ class TestResolveAnthropicToken:
 
         assert resolve_anthropic_token() == "pool-oauth-token"
 
+    @pytest.mark.parametrize("state,age,reset,second,expected", [
+        ("exhausted", 120, 3600, "ok", "second"),
+        ("exhausted", 120, -1, "ok", "first"),
+        ("exhausted", 120, None, "ok", "second"),
+        ("exhausted", 3601, None, "ok", "first"),
+        ("exhausted", 120, None, None, "first"),
+        ("exhausted", 30, None, None, None),
+        ("exhausted", 120, None, "dead", "first"),
+        ("ok", 0, None, "ok", "first"),
+        ("dead", 0, None, "ok", "second"),
+    ])
+    def test_pool_cooldown_resolution_preserves_auth_store(
+        self, monkeypatch, tmp_path, state, age, reset, second, expected,
+    ):
+        """Persisted cooldowns use pool TTL semantics without diagnostic writes."""
+        home = tmp_path / "home"
+        home.mkdir()
+        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.delenv("ANTHROPIC_TOKEN", raising=False)
+        monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
+        monkeypatch.setattr("agent.anthropic_credentials.Path.home", lambda: tmp_path)
+        monkeypatch.setattr("agent.anthropic_credentials.read_claude_code_credentials", lambda: None)
+        now = time.time()
+        entries = [{
+            "id": "first", "source": "manual", "auth_type": "oauth",
+            "access_token": "sk-ant-oat01-first", "last_status": state,
+            "last_status_at": now - age, "last_error_code": 429,
+            "last_error_reset_at": now + reset if reset is not None else None,
+        }]
+        if second is not None:
+            entries.append({
+                "id": "second", "source": "manual", "auth_type": "oauth",
+                "access_token": "sk-ant-oat01-second", "last_status": second,
+            })
+        (home / "auth.json").write_text(json.dumps({
+            "version": 1, "providers": {}, "credential_pool": {"anthropic": entries},
+        }))
+        snapshot = lambda: {
+            str(path.relative_to(home)): path.read_bytes() for path in home.rglob("*") if path.is_file()
+        }
+        before = snapshot()
+        monkeypatch.setattr("agent.credential_pool.load_pool", self._assert_not_called)
+
+        assert resolve_anthropic_token() == (f"sk-ant-oat01-{expected}" if expected else None)
+        assert snapshot() == before
+
     def test_pool_resolution_does_not_mutate_hermes_home(self, monkeypatch, tmp_path):
         """#123747: diagnostic token resolution must not enter load_pool's write path."""
         home = tmp_path / "home"
