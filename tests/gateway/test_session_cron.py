@@ -1,11 +1,13 @@
 """Cron admissions retain exact job identity and stored-job model policy."""
 import asyncio
+import json
 from types import SimpleNamespace
 
 import pytest
 
 
-def test_cron_admission_uses_job_model_and_exact_retry(tmp_path, monkeypatch):
+@pytest.mark.parametrize('workdir_state', ['unset', 'present', 'removed'])
+def test_cron_admission_uses_job_model_and_exact_retry(tmp_path, monkeypatch, caplog, workdir_state):
     from cron import jobs
     from gateway import run, session_cron
     from gateway.session import SessionStore
@@ -15,7 +17,14 @@ def test_cron_admission_uses_job_model_and_exact_retry(tmp_path, monkeypatch):
     from hermes_state_runtime import begin_runtime_epoch, RuntimeStoreError
 
     monkeypatch.setenv('HERMES_HOME', str(tmp_path))
-    monkeypatch.setattr(jobs, 'get_job', lambda jid: {'id': jid, 'prompt': 'original', 'model': 'per-job-model'})
+    job = {'id': 'job', 'prompt': 'original', 'model': 'per-job-model'}
+    workdir = tmp_path / 'project'
+    if workdir_state != 'unset':
+        workdir.mkdir()
+        job['workdir'] = str(workdir)
+        if workdir_state == 'removed':
+            workdir.rmdir()
+    monkeypatch.setattr(jobs, 'get_job', lambda jid: job)
     monkeypatch.setattr(run, '_load_gateway_config', lambda: {'model': {}, 'platform_toolsets': {'cli': []}})
     db = SessionDB(tmp_path / 'state.db')
     from gateway.config import GatewayConfig
@@ -37,6 +46,14 @@ def test_cron_admission_uses_job_model_and_exact_retry(tmp_path, monkeypatch):
         policy = runner.adapters[next(iter(runner.adapters))].policies[receipt['session_id']]
         assert policy.model == 'per-job-model'
         assert policy.source == 'cron'
+        if workdir_state != 'unset':
+            expected = str(workdir) if workdir_state == 'present' else None
+            assert json.loads(policy.request_json)['cron_job']['workdir'] == expected
+            assert job['workdir'] == str(workdir)
+            if expected is not None:
+                assert policy.cwd == expected
+            else:
+                assert sum('no longer exists' in record.message for record in caplog.records) == 1
 
     try:
         asyncio.run(probe())

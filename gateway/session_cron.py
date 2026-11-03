@@ -106,7 +106,7 @@ def _create(authority, actor, params):
     from gateway.session_local_recovery import local_identity, restore_local_session
     from gateway.session_policy import build_policy, bind_launch_key
     from gateway.run import _load_gateway_config
-    from cron.scheduler import _load_cron_job_config
+    from cron.scheduler import _load_cron_job_config, _resolve_job_workdir
     from gateway.config import Platform
     from gateway.session import SessionSource, SessionEntry
     from gateway.session_lifecycle import _now
@@ -133,7 +133,12 @@ def _create(authority, actor, params):
     private = {}
     launch = {'source': 'cli', 'request_id': request_id, 'toolsets': []}
     if job.get('workdir'):
-        launch['cwd'] = job['workdir']
+        workdir = _resolve_job_workdir(job, jid)
+        if workdir:
+            launch['cwd'] = workdir
+        # The scheduler consumes this admission snapshot; keep it consistent
+        # so a missing directory is warned about only once.
+        job = {**job, 'workdir': workdir}
     policy = build_policy(launch, config, private_secrets=private)
     policy = replace(policy, source='cron', platform='cron', model=_load_cron_job_config(job, jid, job.get('name') or jid).model,
                      request_json=json.dumps({'cron_job': job, 'extra_prompt': extra, 'request_id': request_id}))
