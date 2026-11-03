@@ -658,7 +658,12 @@ def atomic_roundtrip_yaml_save(path: str | Path, new_state: dict, *,
         if isinstance(value, dict) and isinstance(current, CommentedMap):
             _merge(current, value)
         elif isinstance(value, list) and isinstance(current, CommentedSeq):
-            _merge_seq(current, value)
+            if not value and current:
+                # Clearing a block sequence in place leaves its key's inline comment
+                # attached to the old block layout; ruamel then emits [] at column 0.
+                dst[key] = CommentedSeq()
+            else:
+                _merge_seq(current, value)
         elif not _unchanged(current, value):
             dst[key] = _rt_value(value)
         # else: unchanged — keep the existing node and the comments/quoting attached to it

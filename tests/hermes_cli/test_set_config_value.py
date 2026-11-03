@@ -840,6 +840,30 @@ class TestMalformedYAMLConfigPreservation:
         assert raw == self.BROKEN_CONFIG
 
 
+def test_set_empty_list_preserves_inline_comment_and_following_keys(_isolated_hermes_home):
+    config_path = _isolated_hermes_home / "config.yaml"
+    config_path.write_text(
+        "kanban:\n"
+        "  dispatch_profiles:     # some comment\n"
+        "    - mordecai\n"
+        "  dispatch_in_gateway: true\n"
+        "  dispatch_interval_seconds: 60\n",
+        encoding="utf-8",
+    )
+
+    set_config_value("kanban.dispatch_profiles", "[]")
+
+    content = config_path.read_text(encoding="utf-8")
+    assert "dispatch_profiles: []  # some comment" in content
+    assert yaml.safe_load(content) == {
+        "kanban": {
+            "dispatch_profiles": [],
+            "dispatch_in_gateway": True,
+            "dispatch_interval_seconds": 60,
+        }
+    }
+
+
 # ---------------------------------------------------------------------------
 # Literal dots in key paths — regression tests for #84064
 # ---------------------------------------------------------------------------
