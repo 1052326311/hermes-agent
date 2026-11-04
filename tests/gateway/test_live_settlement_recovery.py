@@ -1,5 +1,7 @@
 """An owner that is still alive must expose a failed settlement as recoverable uncertainty."""
 import asyncio
+import sqlite3
+from types import SimpleNamespace
 
 import pytest
 
@@ -92,6 +94,74 @@ async def test_commit_then_error_publishes_the_exact_committed_result(tmp_path, 
         complete, = [f['params']['payload'] for f in frames if f['params']['type'] == 'message.complete']
         assert complete['text'] == 'done' and complete['response_reused'] is True
         assert receipt.admission_id not in authority.pending_results
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('recipient', ['adapter', 'native'])
+@pytest.mark.parametrize('read_site', ['status', 'result'])
+async def test_recovered_reply_survives_transient_read_failure(tmp_path, monkeypatch, recipient, read_site):
+    from gateway import session_ingress, session_results
+    from gateway import session_settlement_recovery as recovery
+
+    db, authority = _authority(tmp_path, monkeypatch)
+    monkeypatch.setattr(authority, '_schedule', lambda ref: None)
+    monkeypatch.setattr(recovery, '_SETTLE_RETRY_DELAYS_S', ())
+    monkeypatch.setattr(recovery, '_RECOVERY_READ_RETRY_DELAY_S', 0.01, raising=False)
+    sent, frames = [], []
+    authority.sessions['s'].event_stream.observers.add(frames.append)
+
+    async def execute(owner, ref, row):
+        owner.pending_results[row['admission_id']] = {
+            'result': {'final_response': 'committed answer', 'completed': True}, 'usage': {}}
+        if recipient == 'adapter':
+            event = SimpleNamespace(message_id=row['admission_id'])
+            owner.pending_deliveries[row['admission_id']] = (object(), event, 'route', 'committed answer', None)
+        return 'committed answer'
+
+    async def send(adapter, event, session_key, response):
+        sent.append((response, get_session_admission(db, admission_id=event.message_id)['status']))
+
+    monkeypatch.setattr('gateway.session_finite.execute_finite_admission', execute)
+    monkeypatch.setattr(session_ingress, 'deliver_response', send)
+    finish = session_results.finish_result
+
+    def commit_then_error(*args, **kwargs):
+        finish(*args, **kwargs)
+        raise OSError('settlement acknowledgement lost')
+
+    monkeypatch.setattr(session_results, 'finish_result', commit_then_error)
+    reads = 0
+
+    def read_after_transient_lock(*args, **kwargs):
+        nonlocal reads
+        reads += 1
+        if reads == 1:
+            raise sqlite3.OperationalError('database is locked')
+        return read(*args, **kwargs)
+
+    if read_site == 'status':
+        read = recovery.get_session_admission
+        monkeypatch.setattr(recovery, 'get_session_admission', read_after_transient_lock)
+    else:
+        read = session_results.admission_result
+        monkeypatch.setattr(session_results, 'admission_result', read_after_transient_lock)
+    with db:
+        receipt = await authority.submit(ACTOR, Submission('committed', REF, {'text': 'work'}, 'queue'))
+        if recipient == 'native':
+            authority.native_waiters.add(receipt.admission_id)
+            waiter = authority.waiters[receipt.admission_id] = asyncio.get_running_loop().create_future()
+        await asyncio.wait_for(authority._drain(REF), 5)
+        assert get_session_admission(db, admission_id=receipt.admission_id)['status'] == 'terminal'
+        if recipient == 'native':
+            assert await asyncio.wait_for(waiter, 1) == 'committed answer'
+            assert sent == []
+        else:
+            assert sent == [('committed answer', 'terminal')]
+        assert reads == 2
+        assert receipt.admission_id not in authority.pending_deliveries
+        assert receipt.admission_id not in authority.pending_results
+        complete = [f['params']['payload'] for f in frames if f['params']['type'] == 'message.complete']
+        assert len(complete) == 1 and complete[0]['text'] == 'committed answer'
 
 
 @pytest.mark.asyncio

@@ -145,13 +145,14 @@ async def test_resolution_racing_recovery_releases_once(tmp_path, monkeypatch, c
 
 
 @pytest.mark.asyncio
-async def test_resolution_the_drain_owned_is_collected_when_its_recovery_fails(tmp_path, monkeypatch):
+async def test_resolution_the_drain_owned_is_collected_after_recovery_read_retry(tmp_path, monkeypatch):
     import sqlite3
     db, authority = _authority(tmp_path, monkeypatch)
     monkeypatch.setattr(authority, '_schedule', lambda ref: None)
     entered, resume = threading.Event(), threading.Event()
     released = []
     mark, read = recovery._mark_unknown, session_results.admission_result
+    reads = 0
 
     def held_mark(*args):
         result = mark(*args)
@@ -163,8 +164,11 @@ async def test_resolution_the_drain_owned_is_collected_when_its_recovery_fails(t
         raise OSError('storage unavailable')
 
     def read_once_fails(*args, **kwargs):
-        monkeypatch.setattr(session_results, 'admission_result', read)
-        raise sqlite3.OperationalError('database is locked')
+        nonlocal reads
+        reads += 1
+        if reads == 1:
+            raise sqlite3.OperationalError('database is locked')
+        return read(*args, **kwargs)
 
     async def execute(owner, ref, row):
         owner.pending_results[row['admission_id']] = {'result': {'final_response': 'reply'}, 'usage': {}}
@@ -188,7 +192,8 @@ async def test_resolution_the_drain_owned_is_collected_when_its_recovery_fails(t
             await asyncio.gather(drain, return_exceptions=True)
             await async_wait_until(lambda: not mutation_tasks(authority), timeout=5, what='recovery cleanup')
         assert get_session_admission(db, admission_id=receipt.admission_id)['status'] == 'terminal'
-        assert released == [receipt.admission_id], 'a resolved turn keeps its cleanup when the drain fails'
+        assert reads == 2
+        assert released == [receipt.admission_id], 'a resolved turn keeps its cleanup after a read retry'
 
 
 @pytest.mark.asyncio

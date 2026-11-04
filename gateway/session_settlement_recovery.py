@@ -203,6 +203,42 @@ def commit_and_publish(authority, live, ref, row, response, outcome, captured, s
 # Pauses between settlement attempts after a transient storage error (held writer past its
 # patience, full disk). Bounded: the attempts after the last one fall back to the unknown fence.
 _SETTLE_RETRY_DELAYS_S = (0.5, 2.0)
+_RECOVERY_READ_RETRY_DELAY_S = 1.0
+
+
+async def read_recovered_admission(authority, admission_id):
+    while True:
+        try:
+            return get_session_admission(authority.db, admission_id=admission_id)
+        except (OSError, sqlite3.Error):
+            await asyncio.sleep(_RECOVERY_READ_RETRY_DELAY_S)
+
+
+async def publish_recovered_result(authority, live, ref, row, current, settlement):
+    from gateway.session_results import admission_result
+    admission_id = row['admission_id']
+    while True:
+        with live.event_stream.lock:
+            try:
+                captured = admission_result(authority.db, admission_id)
+            except (OSError, sqlite3.Error):
+                pass
+            else:
+                authority.pending_results.pop(admission_id, None)
+                settlement['settled'] = current
+                if captured is None:
+                    # An operator discarded uncertainty while recovery yielded. There is
+                    # no committed answer to replay; its queued successor may now run.
+                    authority.pending_deliveries.pop(admission_id, None)
+                    waiter = authority.waiters.pop(admission_id, None)
+                    if waiter is not None and not waiter.done():
+                        waiter.set_exception(RuntimeStoreError('unknown_execution'))
+                    settlement['discarded'] = True
+                    return None
+                response = captured['result'].get('final_response') or ''
+                publish_terminal(authority, ref, row, current, response, captured)
+                return response
+        await asyncio.sleep(_RECOVERY_READ_RETRY_DELAY_S)
 
 
 async def settle_with_retry(authority, live, ref, row, response, outcome, captured, settlement):
@@ -272,7 +308,7 @@ async def settle_and_deliver(authority, live, ref, row, response, outcome):
                     authority._pause(ref, 'unknown_execution')
                     return False
                 # Discard can race the off-loop recovery stamp; its terminal decision wins.
-                current = get_session_admission(authority.db, admission_id=admission_id)
+                current = await read_recovered_admission(authority, admission_id)
                 status = current['status']
                 if status == 'unknown':
                     from gateway.session_ingress import retain_unsettled_delivery
@@ -282,22 +318,14 @@ async def settle_and_deliver(authority, live, ref, row, response, outcome):
                     return False
                 # A write can commit before reporting failure. Re-read its exact result,
                 # then publish the terminal outcome rather than inventing uncertainty.
-                from gateway.session_results import admission_result
-                with live.event_stream.lock:
-                    captured = admission_result(authority.db, admission_id)
-                    authority.pending_results.pop(admission_id, None)
-                    settled = current
-                    if captured is None:
-                        # An operator discarded uncertainty while recovery yielded. There is
-                        # no committed answer to replay; its queued successor may now run.
-                        authority.pending_deliveries.pop(admission_id, None)
-                        waiter = authority.waiters.pop(admission_id, None)
-                        if waiter is not None and not waiter.done():
-                            waiter.set_exception(RuntimeStoreError('unknown_execution'))
-                        discarded = True
-                        return True
-                    response = captured['result'].get('final_response') or ''
-                    publish_terminal(authority, ref, row, settled, response, captured)
+                try:
+                    response = await publish_recovered_result(authority, live, ref, row, current, settlement)
+                finally:
+                    if 'settled' in settlement:
+                        settled = settlement['settled']
+                        discarded = settlement.get('discarded', False)
+                if discarded:
+                    return True
         finally:
             # The stamp names a claimed, unsettled execution. Left in place, idle
             # mutations (session.updated) would carry a terminal generation and
