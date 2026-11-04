@@ -52,8 +52,8 @@ _TAILSCALE_CGNAT = ipaddress.IPv4Network("100.64.0.0/10")
 
 def _strip_provider_prefix(model: str) -> str:
     """Strip a registry-known provider prefix: ``"local:m"`` -> ``"m"``. Ollama ``model:tag``
-    ids are preserved even when the model half is a provider name (``qwen:0.5b``)."""
-    if ":" not in model or model.startswith("http"):
+    ids and double-colon model ids are preserved even when the first part is a provider name."""
+    if ":" not in model or model.startswith("http") or model.partition(":")[2].startswith(":"):
         return model
     prefix, suffix = model.split(":", 1)
     try:
