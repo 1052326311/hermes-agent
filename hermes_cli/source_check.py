@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -386,6 +387,17 @@ def _update_refuses(co: _Checkout, target: str, home: Path) -> bool:
     def remote(sha: str) -> Optional[bool]:
         return _github_predates_runtime(co.repository or OFFICIAL_REPOSITORY, sha,
                                         home / "source-checks" / "release-runtime.json")
+    version = _git_stdout(["--version"], cwd=co.root, git=co.git)
+    match = re.search(r"git version (\d+)\.(\d+)", version or "")
+    if match is None or (int(match[1]), int(match[2])) < (2, 44):
+        promisor = _git_stdout(
+            ["config", "--get-regexp", r"^(remote\..*\.promisor|extensions\.partialclone)$"],
+            cwd=co.root, git=co.git,
+        )
+        if promisor and any(line.rsplit(None, 1)[-1].lower() != "false" for line in promisor.splitlines()):
+            # Old Git ignores GIT_NO_LAZY_FETCH. Treat local object probes as unavailable;
+            # the remote schema verdict is read-only and the updater still guards the move.
+            return would_refuse(co.root, target, home, git=lambda *_: -1, remote=remote)
     return would_refuse(co.root, target, home, git=git, remote=remote)
 
 
