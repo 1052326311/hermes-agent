@@ -28,8 +28,10 @@ def mark_recommended(choices: list[str]) -> list[str]:
 def strip_recommended(text: str) -> str:
     """Remove the recommendation label so presentation never leaks into ``user_response``."""
     stripped = str(text).strip()
-    if stripped.casefold().endswith(RECOMMENDED_LABEL.casefold()):
-        return stripped[: -len(RECOMMENDED_LABEL)].strip()
+    from agent.i18n import t
+    for label in (t("gateway.clarify.recommended"), RECOMMENDED_LABEL):
+        if stripped.casefold().endswith(label.casefold()):
+            return stripped[: -len(label)].strip()
     return stripped
 
 

@@ -187,6 +187,19 @@ class TestClarifyRecommendedLabel:
         _ask(cb, [{"question": "Pick", "choices": ["Rebase (recommended)", "Merge"]}])
         assert seen == ["Rebase (recommended)", "Merge"]
 
+    def test_french_and_english_labels_are_removed_from_answers(self, monkeypatch):
+        from agent.i18n import reset_language_cache
+        from tools.clarify_tool import strip_recommended
+
+        monkeypatch.setenv("HERMES_LANGUAGE", "fr")
+        reset_language_cache()
+        try:
+            assert strip_recommended("Rebase (recommandé)") == "Rebase"
+            assert strip_recommended("Rebase (Recommended)") == "Rebase"
+            assert strip_recommended("Merge") == "Merge"
+        finally:
+            reset_language_cache()
+
     def test_open_ended_unaffected(self):
         def cb(questions):
             assert questions[0]["choices"] is None

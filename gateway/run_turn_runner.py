@@ -603,8 +603,14 @@ class TurnRunner(GatewayTurnProgressMixin, GatewaySessionAgentMixin):
         hint = "" if platform == Platform.LOCAL else f"\n{t('gateway.clarify.skip_hint')}"
         for index, entry in enumerate(questions):
             question = f"{entry['question']}{hint}"
+            choices = entry["choices"]
+            if platform != Platform.LOCAL and choices:
+                from tools.clarify_tool import RECOMMENDED_LABEL
+                choices = list(choices)
+                if choices[0].casefold().endswith(RECOMMENDED_LABEL.casefold()):
+                    choices[0] = f"{choices[0][:-len(RECOMMENDED_LABEL)].rstrip()} {t('gateway.clarify.recommended')}"
             raw, answered = self._ask_clarify_question(
-                question, entry["choices"], bool(entry["multi_select"]), rearm=index == last)
+                question, choices, bool(entry["multi_select"]), rearm=index == last)
             if raw == CANCELLED:
                 reply["outcome"] = "cancelled"
                 break

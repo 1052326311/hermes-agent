@@ -14,6 +14,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from gateway.config import Platform
 from gateway.platforms.base import BasePlatformAdapter, SendResult
 from tools import clarify_gateway as cm
 
@@ -100,6 +101,32 @@ def test_rejected_card_is_reasked_as_plain_text_and_the_typed_answer_counts(loop
     assert reply == {"answers": {"q0": "beta"}, "outcome": "submitted"}  # the numbered text prompt maps "2" back to the choice
     assert adapter.cards == 1
     assert len(adapter.sent_text) == 1 and "1. alpha" in adapter.sent_text[0]
+
+
+@pytest.mark.parametrize("typed", ["1", "Rebase", "Rebase (recommandé)"])
+def test_french_gateway_fallback_renders_local_label_and_returns_bare_choice(loop, monkeypatch, typed):
+    from agent.i18n import reset_language_cache
+    from tools.clarify_tool import clarify_tool
+
+    async def rejected():
+        return SendResult(success=False, error="native card unavailable")
+
+    monkeypatch.setenv("HERMES_LANGUAGE", "fr")
+    reset_language_cache()
+    try:
+        adapter = _CardAdapter(rejected)
+        _answer_once_text_prompt_is_seen(adapter, typed)
+        runner = _runner(adapter, loop, monkeypatch)
+        runner._ctx.source = SimpleNamespace(platform=Platform.SIGNAL)
+        result = json.loads(clarify_tool(
+            [{"question": "Choisir?", "choices": ["Rebase", "Merge"]}],
+            callback=runner._clarify_callback_sync,
+        ))
+        assert "Rebase (recommandé)" in adapter.sent_text[0]
+        assert "(Recommended)" not in adapter.sent_text[0]
+        assert result["responses"][0]["user_response"] == "Rebase"
+    finally:
+        reset_language_cache()
 
 
 def test_declined_card_is_never_reasked_as_text(loop, monkeypatch):

@@ -95,6 +95,31 @@ def test_a_cli_source_turn_the_classic_cli_did_not_submit_keeps_one_card_per_que
     assert reply == {'answers': {'q0': 'blue', 'q1': 'blue'}, 'outcome': 'submitted'}
 
 
+def test_messaging_clarify_localizes_recommendation_without_changing_local_viewer_wire(monkeypatch):
+    from agent.i18n import reset_language_cache
+    from gateway import run_turn_runner
+    from tools.clarify_tool import mark_recommended
+
+    monkeypatch.setenv('HERMES_LANGUAGE', 'fr')
+    reset_language_cache()
+    try:
+        seen = []
+        runner = run_turn_runner.TurnRunner.__new__(run_turn_runner.TurnRunner)
+        runner._ctx = SimpleNamespace(source=SimpleNamespace(platform=Platform.SIGNAL))
+        runner._ask_clarify_question = lambda question, choices, multi, **kwargs: seen.append(choices) or (choices[0], True)
+        questions = [{'qid': 'q0', 'question': 'Choisir?',
+                      'choices': mark_recommended(['Rebase', 'Merge']), 'multi_select': False}]
+        reply = runner._clarify_callback_sync(questions)
+        assert seen == [['Rebase (recommandé)', 'Merge']]
+        assert reply['answers']['q0'] == 'Rebase (recommandé)'
+
+        runner._ctx.source.platform = Platform.LOCAL
+        runner._clarify_callback_sync(questions)
+        assert seen[-1] == ['Rebase (Recommended)', 'Merge']
+    finally:
+        reset_language_cache()
+
+
 def test_a_tui_turn_that_asked_for_the_batch_gets_the_batch_panel(monkeypatch):
     """TUI-18: main's Ink TUI (like its classic CLI and Desktop) showed the clarify tool's whole
     question set in one batch panel. A turn whose submitting viewer declares ``clarify_batch`` gets
