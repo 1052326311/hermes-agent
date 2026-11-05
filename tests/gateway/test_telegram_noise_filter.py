@@ -237,11 +237,26 @@ def test_plugin_platform_string_suppresses_noise():
 
 
 @pytest.mark.parametrize("platform", CHAT_PLATFORMS)
-def test_chat_gateways_keep_normal_answers(platform):
+@pytest.mark.parametrize("answer", [
+    "Here is the clean summary you asked for.",
+    "HTTP 200 OK",
+    "✅ **HTTP 202** — accepted, the card was posted.",
+    "HTTP 304 Not Modified — the cached copy is current.",
+    "The docs mention HTTP 500.",
+])
+def test_chat_gateways_keep_normal_answers(platform, answer):
     """Normal assistant content must pass through unchanged on chat surfaces."""
-    answer = "Here is the clean summary you asked for."
-
     assert _sanitize_gateway_final_response(platform, answer) == answer
+    assert _prepare_gateway_status_message(platform, "lifecycle", answer) == answer
+
+
+@pytest.mark.parametrize("status", [400, 401, 429, 500, 599])
+def test_chat_gateways_sanitize_http_error_envelopes(status):
+    raw = f"HTTP {status}: provider request failed. request_id=req_example"
+    reply = _sanitize_gateway_final_response(Platform.TELEGRAM, raw)
+    assert reply and str(status) not in reply and "req_example" not in reply
+    assert _prepare_gateway_status_message(Platform.TELEGRAM, "lifecycle", raw) == reply
+    assert _sanitize_gateway_final_response(Platform.LOCAL, raw) == raw
 
 
 @pytest.mark.parametrize("platform", CHAT_PLATFORMS)
