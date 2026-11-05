@@ -1,4 +1,4 @@
-"""Main's TUI text for the session reads its sidecar answered itself: /status, /context.
+"""Plain text for TUI session reads: /status, /context, /insights.
 
 On main the TUI's ``slash.exec`` never reached the messaging gateway's handlers: ``/status`` was
 ``session.status`` (``Hermes TUI Status``), ``/context`` was ``_format_live_context_output`` (the
@@ -27,6 +27,8 @@ def tui_read(policy, name: str, arg: str):
         return _status
     if name == 'context':
         return _context
+    if name == 'insights':
+        return _insights
     return None
 
 
@@ -116,6 +118,23 @@ def _context(authority, ref, live, policy, agent, arg) -> str:
     if count := int(getattr(compressor, 'compression_count', 0) or 0):
         lines.append(f'Compressions: {count:,}')
     return '\n'.join(lines)
+
+
+def _insights(authority, ref, live, policy, agent, arg) -> str:
+    from agent.i18n import t
+    from agent.insights import InsightsEngine
+    from gateway.slash_commands_status import _insights_args
+    try:
+        days, source = _insights_args(arg)
+    except ValueError as exc:
+        return t('gateway.insights.invalid_days', value=exc)
+    try:
+        engine = InsightsEngine(authority.db)
+        return engine.format_terminal(engine.generate(days=days, source=source))
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).exception('Insights command error')
+        return t('gateway.insights.error', error=exc)
 
 
 async def run_tui_read(authority, ref, live, policy, render, arg) -> dict:

@@ -79,6 +79,27 @@ def history_unreadable() -> str:
     return t("gateway.shared.history_unreadable")
 
 
+def _insights_args(args: str) -> tuple[int, str | None]:
+    args = re.sub(r'[\u2012\u2013\u2014\u2015](days|source)', r'--\1', args.strip())
+    days, source = 30, None
+    parts = args.split()
+    i = 0
+    while i < len(parts):
+        flag, value = parts[i], parts[i + 1] if i + 1 < len(parts) else None
+        if flag == "--days" and value is not None:
+            try:
+                days = int(value)
+            except ValueError:
+                raise ValueError(value) from None
+            i += 2
+        elif flag == "--source" and value is not None:
+            source, i = value, i + 2
+        else:
+            days = int(flag) if flag.isdigit() else days
+            i += 1
+    return days, source
+
+
 def _configured_provider() -> str:
     """``model.provider`` from the gateway config ("" when unset)."""
     from gateway.run import _load_gateway_config
@@ -668,24 +689,10 @@ class GatewayStatusCommandsMixin:
 
     async def _handle_insights_command(self, event: MessageEvent) -> str:
         """Handle /insights [N | --days N] [--source S] -- usage insights and analytics."""
-        # Normalize Unicode dashes (Telegram/iOS auto-converts -- to em/en dash)
-        args = re.sub(r'[\u2012\u2013\u2014\u2015](days|source)', r'--\1', event.get_command_args().strip())
-        days, source = 30, None
-        parts = args.split()
-        i = 0
-        while i < len(parts):
-            flag, value = parts[i], parts[i + 1] if i + 1 < len(parts) else None
-            if flag == "--days" and value is not None:
-                try:
-                    days = int(value)
-                except ValueError:
-                    return t("gateway.insights.invalid_days", value=value)
-                i += 2
-            elif flag == "--source" and value is not None:
-                source, i = value, i + 2
-            else:
-                days = int(flag) if flag.isdigit() else days
-                i += 1
+        try:
+            days, source = _insights_args(event.get_command_args())
+        except ValueError as exc:
+            return t("gateway.insights.invalid_days", value=exc)
         try:
             from hermes_state_registry import acquire
             from agent.insights import InsightsEngine

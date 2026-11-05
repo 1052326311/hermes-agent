@@ -99,6 +99,15 @@ async def test_tui_context_with_a_live_agent_renders_the_category_table(owner, m
 
 
 @pytest.mark.asyncio
+async def test_tui_insights_uses_plain_text_for_its_pager(owner):
+    sid = (await owner.call('session.create', request_id='t', source='tui', cwd=str(owner.workdir)))['session_id']
+    out = await _exec(owner, sid, 'insights')
+    assert 'Hermes Insights' in out and '**' not in out, out
+    assert 'Hermes Insights' in await _exec(owner, sid, 'insights --days 7')
+    assert 'Invalid --days value: nope' == await _exec(owner, sid, 'insights --days nope')
+
+
+@pytest.mark.asyncio
 async def test_tui_cron_is_the_classic_overview_with_the_profile_jobs(owner):
     from cron.jobs import create_job
     from hermes_constants import reset_hermes_home_override, set_hermes_home_override
@@ -218,7 +227,7 @@ async def test_other_surfaces_keep_the_gateway_handlers(owner):
     from gateway.session_tui_reads import tui_read
     for source in ('cli', 'gui', 'acp'):
         policy = SimpleNamespace(source=source)
-        assert tui_read(policy, 'status', '') is None and tui_read(policy, 'context', '') is None
+        assert all(tui_read(policy, name, '') is None for name in ('status', 'context', 'insights'))
     assert tui_read(None, 'status', '') is None
 
 
