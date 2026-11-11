@@ -273,14 +273,16 @@ hermes skills install openai/skills/k8s
 
 ### MCP 服务器
 
+GitHub 示例使用 [GitHub 官方 MCP 服务器](https://github.com/github/github-mcp-server)，需要已安装且正在运行的 Docker。将具有所需仓库权限的 PAT 保存在当前配置档的 `.env` 中，并通过下方的 `env` 映射显式传给子进程；Docker 的 `-e` 参数将其传入容器。
+
 ```yaml
 # 添加到 ~/.hermes/config.yaml
 mcp_servers:
   github:
-    command: npx
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "ghp_xxx"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
 ```
 
 ### 编辑器集成（ACP）

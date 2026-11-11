@@ -168,14 +168,16 @@ For stdio servers, Hermes does NOT pass your full shell environment to MCP subpr
 
 All other environment variables (API keys, tokens, secrets) are excluded unless you explicitly add them via the `env` config key. This prevents accidental credential leakage to untrusted MCP servers.
 
+The GitHub examples use [GitHub's official MCP server](https://github.com/github/github-mcp-server) and require Docker to be installed and running. Store a PAT with the intended repository permissions in the active profile's `.env`, and pass it explicitly through the `env` mapping below; Docker's `-e` forwards it into the container.
+
 ```yaml
 mcp_servers:
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
       # Only this token is passed to the subprocess
-      GITHUB_PERSONAL_ACCESS_TOKEN: "ghp_..."
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
 ```
 
 ### Credential Stripping in Error Messages
@@ -261,10 +263,10 @@ Registers tools like `mcp_filesystem_read_file`, `mcp_filesystem_write_file`, `m
 ```yaml
 mcp_servers:
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "ghp_xxxxxxxxxxxxxxxxxxxx"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
     timeout: 60
 ```
 
@@ -296,10 +298,10 @@ mcp_servers:
     args: ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/allowed/dir"]
 
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "ghp_xxxxxxxxxxxxxxxxxxxx"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
 
   company_api:
     url: "https://mcp.internal.company.com/mcp"

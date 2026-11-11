@@ -99,15 +99,19 @@ Tell me which MCP-backed tools are available right now.
 
 ### 示例：仅白名单你需要的内容
 
+GitHub 示例使用 [GitHub 官方 MCP 服务器](https://github.com/github/github-mcp-server)，需要已安装且正在运行的 Docker。将具有所需仓库权限的 PAT 保存在当前配置档的 `.env` 中，并通过下方的 `env` 映射显式传给子进程；Docker 的 `-e` 参数将其传入容器。
+
+旧的 `@modelcontextprotocol/server-github` 包已归档且不再维护；迁移现有配置时也需更新工具白名单。
+
 ```yaml
 mcp_servers:
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "***"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
     tools:
-      include: [list_issues, create_issue, search_code]
+      include: [list_issues, search_code]
 ```
 
 对于敏感系统，这通常是最佳默认设置。
@@ -272,12 +276,12 @@ Check the local git state and summarize what changed recently.
 ```yaml
 mcp_servers:
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "***"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
     tools:
-      include: [list_issues, create_issue, update_issue, search_code]
+      include: [list_issues, issue_write, search_code]
       prompts: false
       resources: false
 ```
@@ -346,12 +350,12 @@ List prompts exposed by the docs server and tell me which ones would help with i
 ```yaml
 mcp_servers:
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "***"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
     tools:
-      include: [list_issues, create_issue, search_code]
+      include: [list_issues, search_code]
       prompts: false
       resources: false
 ```
@@ -364,11 +368,11 @@ Search the codebase for references to MCP and summarize the main integration poi
 
 ### 阶段 2：仅在需要时扩展
 
-如果之后还需要更新 issue：
+如果之后需要创建或更新 issue，请显式添加 `issue_write`。官方服务器通过同一个工具的 `method: create` / `method: update` 提供两种操作，工具白名单不能将它们分别授权：
 
 ```yaml
 tools:
-  include: [list_issues, create_issue, update_issue, search_code]
+  include: [list_issues, issue_write, search_code]
 ```
 
 然后重新加载：
@@ -382,12 +386,12 @@ tools:
 ```yaml
 mcp_servers:
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "***"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
     tools:
-      include: [list_issues, create_issue, update_issue, search_code]
+      include: [list_issues, issue_write, search_code]
       prompts: false
       resources: false
 

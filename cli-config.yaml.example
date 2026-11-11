@@ -1657,11 +1657,12 @@ platform_toolsets:
 #     args: ["-y", "@modelcontextprotocol/server-filesystem", "/home/user"]
 #   notion:
 #     url: https://mcp.notion.com/mcp
+#   # Requires Docker installed/running and a PAT in the active profile's .env.
 #   github:
-#     command: npx
-#     args: ["-y", "@modelcontextprotocol/server-github"]
+#     command: "docker"
+#     args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
 #     env:
-#       GITHUB_PERSONAL_ACCESS_TOKEN: "ghp_..."
+#       GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
 #
 # Sampling (server-initiated LLM requests) — enabled by default.
 # Per-server config under the 'sampling' key:

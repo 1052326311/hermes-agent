@@ -61,13 +61,15 @@ Hermes 会发现 MCP 服务器的工具，并像使用其他工具一样使用�
 
 Stdio 服务器作为本地子进程运行，通过 stdin/stdout 通信。
 
+GitHub 示例使用 [GitHub 官方 MCP 服务器](https://github.com/github/github-mcp-server)，需要已安装且正在运行的 Docker。将具有所需仓库权限的 PAT 保存在当前配置档的 `.env` 中，并通过下方的 `env` 映射显式传给子进程；Docker 的 `-e` 参数将其传入容器。
+
 ```yaml
 mcp_servers:
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "***"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
 ```
 
 适合使用 stdio 服务器的场景：
@@ -167,7 +169,7 @@ mcp_<server_name>_<tool_name>
 | 服务器 | MCP 工具 | 注册名称 |
 |---|---|---|
 | `filesystem` | `read_file` | `mcp_filesystem_read_file` |
-| `github` | `create-issue` | `mcp_github_create_issue` |
+| `github` | `issue_write` | `mcp_github_issue_write` |
 | `my-api` | `query.data` | `mcp_my_api_query_data` |
 
 实际使用中，你通常不需要手动调用带前缀的名称——Hermes 在正常推理过程中会自动识别并选择该工具。
@@ -214,15 +216,15 @@ mcp_servers:
 ```yaml
 mcp_servers:
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "***"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
     tools:
-      include: [create_issue, list_issues]
+      include: [list_issues]
 ```
 
-只有列出的 MCP 服务器工具会被注册。
+只有列出的 MCP 服务器工具会被注册，此示例不暴露 issue 写入操作。若需要创建和更新 issue，请显式添加 `issue_write`；它通过 `method: create` / `method: update` 合并提供两种操作，无法按工具名称分别授权。
 
 ### 黑名单过滤服务器工具
 
@@ -242,8 +244,8 @@ mcp_servers:
 
 ```yaml
 tools:
-  include: [create_issue]
-  exclude: [create_issue, delete_issue]
+  include: [list_issues]
+  exclude: [list_issues, search_code]
 ```
 
 `include` 优先生效。
@@ -270,12 +272,12 @@ mcp_servers:
 ```yaml
 mcp_servers:
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "***"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
     tools:
-      include: [create_issue, list_issues, search_code]
+      include: [list_issues, search_code]
       prompts: false
 
   stripe:
@@ -353,12 +355,12 @@ mcp-<server>
 ```yaml
 mcp_servers:
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "***"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
     tools:
-      include: [list_issues, create_issue, update_issue]
+      include: [list_issues, issue_write]
       prompts: false
       resources: false
 ```

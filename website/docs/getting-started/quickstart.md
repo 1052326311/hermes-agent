@@ -319,14 +319,16 @@ See [Skills System](../user-guide/features/skills.md) for writing your own, exte
 
 ### MCP servers
 
+The GitHub examples use [GitHub's official MCP server](https://github.com/github/github-mcp-server) and require Docker to be installed and running. Store a PAT with the intended repository permissions in the active profile's `.env`, and pass it explicitly through the `env` mapping below; Docker's `-e` forwards it into the container.
+
 ```yaml
 # Add to ~/.hermes/config.yaml
 mcp_servers:
   github:
-    command: npx
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "ghp_xxx"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
 ```
 
 ### Editor integration (ACP)

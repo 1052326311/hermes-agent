@@ -439,11 +439,6 @@ Agent 身份文件是独立的：Hermes 从 `$HERMES_HOME/SOUL.md` 加载其主�
       command = "npx";
       args = [ "-y" "@modelcontextprotocol/server-filesystem" "/data/workspace" ];
     };
-    github = {
-      command = "npx";
-      args = [ "-y" "@modelcontextprotocol/server-github" ];
-      env.GITHUB_PERSONAL_ACCESS_TOKEN = "\${GITHUB_TOKEN}"; # 从 .env 解析
-    };
   };
 }
 ```
@@ -454,8 +449,14 @@ Agent 身份文件是独立的：Hermes 从 `$HERMES_HOME/SOUL.md` 加载其主�
 
 ### HTTP 传输（远程服务器）
 
+GitHub 示例使用 [GitHub 官方远程 MCP 服务器](https://github.com/github/github-mcp-server)，无需本地 Docker。请通过当前配置档的 `.env` 或 `environmentFiles` 提供具有所需仓库权限的 `GITHUB_TOKEN`。此配置使用 PAT；下节的通用 `auth = "oauth"` 方式不适用于 GitHub。
+
 ```nix
 {
+  services.hermes-agent.mcpServers.github = {
+    url = "https://api.githubcopilot.com/mcp/";
+    headers.Authorization = "Bearer \${GITHUB_TOKEN}";
+  };
   services.hermes-agent.mcpServers.remote-api = {
     url = "https://mcp.example.com/v1/mcp";
     headers.Authorization = "Bearer \${MCP_REMOTE_API_KEY}";

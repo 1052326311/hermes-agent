@@ -105,15 +105,19 @@ Do not wait until later if the server exposes a lot of tools.
 
 ### Example: whitelist only what you want
 
+The GitHub examples use [GitHub's official MCP server](https://github.com/github/github-mcp-server) and require Docker to be installed and running. Store a PAT with the intended repository permissions in the active profile's `.env`, and pass it explicitly through the `env` mapping below; Docker's `-e` forwards it into the container.
+
+The old `@modelcontextprotocol/server-github` package is archived and unmaintained; migrate existing configurations and their tool allowlists too.
+
 ```yaml
 mcp_servers:
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "***"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
     tools:
-      include: [list_issues, create_issue, search_code]
+      include: [list_issues, search_code]
 ```
 
 This is usually the best default for sensitive systems.
@@ -329,12 +333,12 @@ Boundary notes:
 ```yaml
 mcp_servers:
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "***"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
     tools:
-      include: [list_issues, create_issue, update_issue, search_code]
+      include: [list_issues, issue_write, search_code]
       prompts: false
       resources: false
 ```
@@ -403,12 +407,12 @@ Here is a practical progression.
 ```yaml
 mcp_servers:
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "***"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
     tools:
-      include: [list_issues, create_issue, search_code]
+      include: [list_issues, search_code]
       prompts: false
       resources: false
 ```
@@ -421,11 +425,11 @@ Search the codebase for references to MCP and summarize the main integration poi
 
 ### Phase 2: expand only when needed
 
-If you later need issue updates too:
+To allow issue creation or updates, explicitly add `issue_write`. The official server exposes both operations through one tool (`method: create` / `method: update`); a tool allowlist cannot grant them separately:
 
 ```yaml
 tools:
-  include: [list_issues, create_issue, update_issue, search_code]
+  include: [list_issues, issue_write, search_code]
 ```
 
 Then reload:
@@ -439,12 +443,12 @@ Then reload:
 ```yaml
 mcp_servers:
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "***"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
     tools:
-      include: [list_issues, create_issue, update_issue, search_code]
+      include: [list_issues, issue_write, search_code]
       prompts: false
       resources: false
 

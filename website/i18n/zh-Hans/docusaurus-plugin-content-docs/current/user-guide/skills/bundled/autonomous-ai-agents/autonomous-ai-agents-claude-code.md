@@ -656,9 +656,11 @@ Claude 可以编排多个 agent："Use @db-expert to optimize queries, then @sec
 
 为数据库、API 和服务添加外部工具服务器：
 
+GitHub 示例使用 [GitHub 官方 MCP 服务器](https://github.com/github/github-mcp-server)，需要已安装且正在运行的 Docker。请在命令的环境中提供 `GITHUB_PAT`，并仅授予预期仓库所需的权限；Hermes 的 MCP 凭据不会自动传给 Claude Code。
+
 ```
 # GitHub 集成
-terminal(command="claude mcp add -s user github -- npx @modelcontextprotocol/server-github", timeout=30)
+terminal(command="claude mcp add -s user github -e GITHUB_PERSONAL_ACCESS_TOKEN=\"$GITHUB_PAT\" -- docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server", timeout=30)
 
 # PostgreSQL 查询
 terminal(command="claude mcp add -s local postgres -- npx @anthropic-ai/server-postgres --connection-string postgresql://localhost/mydb", timeout=30)

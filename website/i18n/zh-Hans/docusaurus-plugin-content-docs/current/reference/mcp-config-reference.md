@@ -71,7 +71,7 @@ mcp_servers:
 
 ```yaml
 tools:
-  include: [create_issue, list_issues]
+  include: [list_issues, search_code]
 ```
 
 ### `exclude`
@@ -89,13 +89,13 @@ tools:
 
 ```yaml
 tools:
-  include: [create_issue]
-  exclude: [create_issue, delete_issue]
+  include: [list_issues]
+  exclude: [list_issues, search_code]
 ```
 
 结果：
-- `create_issue` 仍被允许
-- `delete_issue` 被忽略，因为 `include` 优先级更高
+- `list_issues` 仍被允许
+- `search_code` 被忽略，因为 `include` 优先级更高
 
 ## 工具策略
 
@@ -155,15 +155,17 @@ mcp_servers:
 
 ### GitHub 安全白名单
 
+GitHub 示例使用 [GitHub 官方 MCP 服务器](https://github.com/github/github-mcp-server)，需要已安装且正在运行的 Docker。将具有所需仓库权限的 PAT 保存在当前配置档的 `.env` 中，并通过下方的 `env` 映射显式传给子进程；Docker 的 `-e` 参数将其传入容器。
+
 ```yaml
 mcp_servers:
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "***"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
     tools:
-      include: [list_issues, create_issue, update_issue, search_code]
+      include: [list_issues, issue_write, search_code]
       resources: false
       prompts: false
 ```
@@ -209,7 +211,7 @@ mcp_<server>_<tool>
 ```
 
 示例：
-- `mcp_github_create_issue`
+- `mcp_github_issue_write`
 - `mcp_filesystem_read_file`
 - `mcp_my_api_query_data`
 

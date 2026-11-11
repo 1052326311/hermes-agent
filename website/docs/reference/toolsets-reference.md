@@ -123,12 +123,16 @@ Platforms provided by plugins get an implicit `hermes-<platform>` bundle that is
 
 Each configured MCP server generates a `mcp-<server>` toolset at runtime. For example, if you configure a `github` MCP server, a `mcp-github` toolset is created containing all tools that server exposes.
 
+The GitHub examples use [GitHub's official MCP server](https://github.com/github/github-mcp-server) and require Docker to be installed and running. Store a PAT with the intended repository permissions in the active profile's `.env`, and pass it explicitly through the `env` mapping below; Docker's `-e` forwards it into the container.
+
 ```yaml
 # config.yaml
 mcp_servers:
   github:
-    command: npx
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
+    env:
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
 ```
 
 This creates a `mcp-github` toolset you can reference in `--toolsets` or platform configs. The bare server name (`github`) works as an alias. If a server is named like a built-in toolset (`browser`, `web`), that name resolves to the built-in tools **plus** the server's `mcp__<server>__*` tools; neither side shadows the other.

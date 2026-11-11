@@ -665,9 +665,11 @@ Configure in `.claude/settings.json` (project) or `~/.claude/settings.json` (glo
 
 Add external tool servers for databases, APIs, and services:
 
+The GitHub example uses [GitHub's official MCP server](https://github.com/github/github-mcp-server). Docker must be installed and running. Supply `GITHUB_PAT` in the command's environment with only the repository permissions you intend to grant; Hermes MCP credentials are not automatically passed to Claude Code.
+
 ```
 # GitHub integration
-terminal(command="claude mcp add -s user github -- npx @modelcontextprotocol/server-github", timeout=30)
+terminal(command="claude mcp add -s user github -e GITHUB_PERSONAL_ACCESS_TOKEN=\"$GITHUB_PAT\" -- docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server", timeout=30)
 
 # PostgreSQL queries
 terminal(command="claude mcp add -s local postgres -- npx @anthropic-ai/server-postgres --connection-string postgresql://localhost/mydb", timeout=30)

@@ -501,11 +501,6 @@ The `mcpServers` option declaratively configures [MCP (Model Context Protocol)](
       command = "npx";
       args = [ "-y" "@modelcontextprotocol/server-filesystem" "/data/workspace" ];
     };
-    github = {
-      command = "npx";
-      args = [ "-y" "@modelcontextprotocol/server-github" ];
-      env.GITHUB_PERSONAL_ACCESS_TOKEN = "\${GITHUB_TOKEN}"; # resolved from .env
-    };
   };
 }
 ```
@@ -516,8 +511,14 @@ Environment variables in `env` values are resolved from `$HERMES_HOME/.env` at r
 
 ### HTTP Transport (Remote Servers)
 
+The GitHub example uses [GitHub's official remote MCP server](https://github.com/github/github-mcp-server), so it needs no local Docker daemon. Supply `GITHUB_TOKEN` through the active profile's `.env` or `environmentFiles`, with only the intended repository permissions. This uses a PAT; the generic `auth = "oauth"` recipe below does not apply to GitHub.
+
 ```nix
 {
+  services.hermes-agent.mcpServers.github = {
+    url = "https://api.githubcopilot.com/mcp/";
+    headers.Authorization = "Bearer \${GITHUB_TOKEN}";
+  };
   services.hermes-agent.mcpServers.remote-api = {
     url = "https://mcp.example.com/v1/mcp";
     headers.Authorization = "Bearer \${MCP_REMOTE_API_KEY}";

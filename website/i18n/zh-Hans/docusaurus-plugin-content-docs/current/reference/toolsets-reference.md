@@ -118,12 +118,16 @@ hermes tools                            # curses UI to enable/disable per platfo
 
 每个已配置的 MCP server 在运行时会生成一个 `mcp-<server>` 工具集。例如，若配置了 `github` MCP server，则会创建包含该 server 所有暴露工具的 `mcp-github` 工具集。
 
+GitHub 示例使用 [GitHub 官方 MCP 服务器](https://github.com/github/github-mcp-server)，需要已安装且正在运行的 Docker。将具有所需仓库权限的 PAT 保存在当前配置档的 `.env` 中，并通过下方的 `env` 映射显式传给子进程；Docker 的 `-e` 参数将其传入容器。
+
 ```yaml
 # config.yaml
 mcp_servers:
   github:
-    command: npx
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
+    env:
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
 ```
 
 这将创建一个 `mcp-github` 工具集，可在 `--toolsets` 或平台配置中引用。

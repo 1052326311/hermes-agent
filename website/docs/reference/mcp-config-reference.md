@@ -78,11 +78,13 @@ mcp_servers:
 
 String values anywhere in a server entry (`env`, `headers`, `args`, `url`, …) may reference environment variables with `${VAR}` or the Cursor-style SecretRef form `${env:VAR}` — both resolve to the same variable, so MCP snippets copied from Cursor / Claude configs work unchanged:
 
+The GitHub examples use [GitHub's official MCP server](https://github.com/github/github-mcp-server) and require Docker to be installed and running. Store a PAT with the intended repository permissions in the active profile's `.env`, and pass it explicitly through the `env` mapping below; Docker's `-e` forwards it into the container.
+
 ```yaml
 mcp_servers:
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
       GITHUB_PERSONAL_ACCESS_TOKEN: "${env:GITHUB_TOKEN}"   # same as "${GITHUB_TOKEN}"
 ```
@@ -128,7 +130,7 @@ If `include` is set, only those server-native MCP tools are registered.
 
 ```yaml
 tools:
-  include: [create_issue, list_issues]
+  include: [list_issues, search_code]
 ```
 
 ### `exclude`
@@ -146,13 +148,13 @@ If both are set, `include` wins.
 
 ```yaml
 tools:
-  include: [create_issue]
-  exclude: [create_issue, delete_issue]
+  include: [list_issues]
+  exclude: [list_issues, search_code]
 ```
 
 Result:
-- `create_issue` is still allowed
-- `delete_issue` is ignored because `include` takes precedence
+- `list_issues` is still allowed
+- `search_code` is ignored because `include` takes precedence
 
 ## Utility-tool policy
 
@@ -223,12 +225,12 @@ If filtering removes all server-native tools and no utility tools are registered
 ```yaml
 mcp_servers:
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "***"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
     tools:
-      include: [list_issues, create_issue, update_issue, search_code]
+      include: [list_issues, issue_write, search_code]
       resources: false
       prompts: false
 ```
@@ -308,7 +310,7 @@ mcp__<server>__<tool>
 ```
 
 Examples:
-- `mcp__github__create_issue`
+- `mcp__github__issue_write`
 - `mcp__filesystem__read_file`
 - `mcp__my_api__query_data`
 

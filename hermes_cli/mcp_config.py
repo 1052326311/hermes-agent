@@ -644,7 +644,7 @@ def cmd_mcp_add(args):
         _error("Must specify --url <endpoint>, --command <cmd>, or --preset <name>")
         _info("Examples:")
         _info('  hermes mcp add ink --url "https://mcp.ml.ink/mcp"')
-        _info('  hermes mcp add github --command npx --args @modelcontextprotocol/server-github')
+        _info('  hermes mcp add time --command uvx --args mcp-server-time')
         _info('  hermes mcp add myserver --preset mypreset')
         return
 

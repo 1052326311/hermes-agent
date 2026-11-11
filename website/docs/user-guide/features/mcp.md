@@ -314,13 +314,15 @@ more capable integration. On Desktop, GitHub mentions instead offer the
 
 Stdio servers run as local subprocesses and talk over stdin/stdout.
 
+The GitHub examples use [GitHub's official MCP server](https://github.com/github/github-mcp-server) and require Docker to be installed and running. Store a PAT with the intended repository permissions in the active profile's `.env`, and pass it explicitly through the `env` mapping below; Docker's `-e` forwards it into the container.
+
 ```yaml
 mcp_servers:
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "***"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
 ```
 
 Use stdio servers when:
@@ -579,7 +581,7 @@ Examples:
 | Server | MCP tool | Registered name |
 |---|---|---|
 | `filesystem` | `read_file` | `mcp_filesystem_read_file` |
-| `github` | `create-issue` | `mcp_github_create_issue` |
+| `github` | `issue_write` | `mcp_github_issue_write` |
 | `my-api` | `query.data` | `mcp_my_api_query_data` |
 
 In practice, you usually do not need to call the prefixed name manually — Hermes sees the tool and chooses it during normal reasoning.
@@ -637,15 +639,15 @@ If `enabled: false`, Hermes skips the server completely and does not even attemp
 ```yaml
 mcp_servers:
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "***"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
     tools:
-      include: [create_issue, list_issues]
+      include: [list_issues]
 ```
 
-Only those MCP server tools are registered.
+Only the listed read tool is registered. To permit issue creation and updates, explicitly add `issue_write`; its `method: create` / `method: update` operations cannot be allowed separately by tool name.
 
 Entries in `include`/`exclude` may also be glob patterns (`*`, `?`, `[...]`,
 matched case-sensitively): `include: ["*_dns_*"]` registers every tool whose
@@ -689,8 +691,8 @@ If both are present:
 
 ```yaml
 tools:
-  include: [create_issue]
-  exclude: [create_issue, delete_issue]
+  include: [list_issues]
+  exclude: [list_issues, search_code]
 ```
 
 `include` wins.
@@ -717,12 +719,12 @@ That means:
 ```yaml
 mcp_servers:
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "***"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
     tools:
-      include: [create_issue, list_issues, search_code]
+      include: [list_issues, search_code]
       prompts: false
 
   stripe:
@@ -821,12 +823,12 @@ The new filtering support is also a security control:
 ```yaml
 mcp_servers:
   github:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-github"]
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "***"
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}"
     tools:
-      include: [list_issues, create_issue, update_issue]
+      include: [list_issues, issue_write]
       prompts: false
       resources: false
 ```
