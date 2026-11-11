@@ -422,15 +422,19 @@ def build_probes() -> list:
     ]
 
 
-def run_probes(probes: list, *, aws_imds: bool = False) -> list:
+def run_probes(probes: list, *, aws_imds: bool | None = None) -> list:
     """Run every probe in a thread pool; results in submission order.
 
     Probes are independent HTTP calls (series cost ~5s wall, 2s of it boto3's IMDS lookup);
     parallel collapses the section to roughly the slowest single probe without changing the output.
-    ``aws_imds=True`` keeps boto3's instance-metadata lookup for probes that must see an EC2 role.
+    By default, configured Bedrock or a named AWS profile keeps the instance-role credential chain.
+    ``aws_imds=True`` also keeps it for inference probes; an explicit user IMDS opt-out still wins.
     """
-    # Disable boto3's EC2 instance-metadata probe (169.254.169.254, multi-second timeout off-EC2). Set on the
-    # parent thread before submitting so it never races a worker; has_aws_credentials() already gates on real creds.
+    if aws_imds is None:
+        from hermes_cli.providers import normalize_provider
+        aws_imds = bool(os.getenv("AWS_PROFILE", "").strip()) or normalize_provider(str(_model_cfg().get("provider") or "")) == "bedrock"
+    # Avoid the multi-second IMDS timeout off EC2 when AWS isn't configured. Decide on the parent
+    # thread before submitting workers, so credential detection and the Bedrock client see the same policy.
     normalize_proxy_env_vars()  # a bracketed-IPv6 NO_PROXY entry ([::1], Clash Verge/mihomo) makes every bare
     # trust_env client a probe builds raise InvalidURL at construction (#118159) — sanitize once, before any
     # worker runs, so no probe ever reports "(Invalid port: :1])" as provider downtime.
