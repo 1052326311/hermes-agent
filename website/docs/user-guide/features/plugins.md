@@ -336,6 +336,42 @@ ordinary CLI/TUI/gateway/ACP surface when the selected transport fails, set
 `transport_fallback: builtin`. Without that exact opt-in, Hermes never
 materializes the prompt on another surface.
 
+#### When a selected transport fails
+
+`Selected approval transport failed (error)` means Hermes could not obtain a
+valid answer from the selected transport, not that the user chose to deny it.
+The action remains blocked. Plugin exception text is omitted because it can
+contain credentials; the host log does not guarantee a more detailed reason.
+
+| Failure | Meaning |
+|---|---|
+| `unavailable` | The selected registration could not be resolved, including plugin discovery failure. |
+| `error` | The callback or worker failed, or Hermes could not construct the redacted request. |
+| `timeout` / `interrupted` | The host wait expired or was interrupted. |
+| `busy` | All bounded transport worker slots are occupied. |
+| `invalid` / `stale` | The reply has an invalid type or choice, or does not match the request ID and digest. |
+
+Check that the plugin is installed and enabled in the affected profile, and
+that `security.approval.transport` names its **registered transport**, which
+can differ from its plugin name. Complete that plugin's setup in the same
+profile. For example, `ntfy-approval` registers `ntfy` and requires a configured
+topic. Follow the [plugin setup instructions](https://github.com/AhmetArif0/hermes-ntfy-approval/blob/95d3a4b838073d6908c578ca1a9f04154349a2cf/ntfy-approval/README.md)
+and keep topic names and access tokens out of shared diagnostics.
+
+To deliberately use the ordinary prompt instead, select `builtin` in that
+profile's `config.yaml`:
+
+```yaml
+security:
+  approval:
+    transport: builtin
+```
+
+Alternatively, keep the selected transport and opt into
+`transport_fallback: builtin` as described above. Failure to construct the
+redacted request still blocks the action without fallback. Fixing the transport
+configuration does not grant consent for the blocked action.
+
 Hermes still owns hardline blocks, sudo-stdin protection, user deny rules,
 request binding, allowed scopes, persistence, hooks, and final authorization.
 Hardline commands are blocked before any transport callback. There is
