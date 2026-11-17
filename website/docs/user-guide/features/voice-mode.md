@@ -237,6 +237,12 @@ voice:
 
 Requirements: an OpenAI API key (`OPENAI_API_KEY`, `VOICE_TOOLS_OPENAI_KEY`, or `voice.gpt_live.api_key`). The voice layer is billed by OpenAI at **$0.05 per minute of session time** (idle time counts); the Hermes turn is billed on its own provider as always. The mode is also in Settings → Voice → *Voice Chat Mode*.
 
+:::note Multiple profiles
+When a gateway serves multiple profiles, GPT-Live reads the active profile's secret scope and does not fall back to the credential pool. A key stored only through `hermes auth add openai-api` can therefore work for normal chat while GPT-Live reports no OpenAI API key. This also applies to the launch profile after the gateway has served another profile.
+
+Put `OPENAI_API_KEY` or `VOICE_TOOLS_OPENAI_KEY` in the intended profile's own `.env` to make it available to GPT-Live. Each profile needs its own voice credentials; another profile's key is not a fallback. A single-profile process can still resolve `OPENAI_API_KEY` from the credential pool.
+:::
+
 How it works: pressing the voice button opens a WebRTC session from the desktop to GPT-Live; the desktop only ever receives a session id and an SDP answer — the key stays on the gateway host, which performs the session creation (`POST /api/audio/voice-live/session`). Each `session.delegation.created` becomes a normal turn on the open chat (the bubble shows what you said; the recent spoken exchange rides the model input as a per-turn note, never the system prompt, so the reply is speakable prose). Tool activity is fed to the voice as quiet context ("Hermes is working: terminal") so it can tell you what is happening if you ask; the final answer is streamed back sentence by sentence. Saying the stop phrase ends the conversation. If `gpt-live` is selected but no key resolves, the button falls back to the chained mode with a notice.
 
 Not supported in this mode: the Nous-managed audio proxy (direct key only), the CLI/TUI (`/voice` keeps the chained loop), and the `tts` tool (it keeps using `tts.provider`).
