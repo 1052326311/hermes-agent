@@ -11,6 +11,8 @@ import sys
 import time
 from pathlib import Path, PurePosixPath
 
+from hermes_cli._parser import command_argv
+
 # Older installers left renamed launchers behind on failure. The startup
 # orphan sweep still restores them. Generation installs never rename live shims.
 QUARANTINE_RESTORE_BACKOFF_MS: tuple[int, ...] = (0, 100, 250, 500, 1000)
@@ -68,17 +70,26 @@ _UPDATE_RETRY_RECOVERED = False
 
 
 def _should_skip_external_secret_sources() -> bool:
-    """True inside any ``hermes update`` process (and its import probes).
+    """Skip external sources for updates and local Kanban card queries.
 
     Every dotenv load in the process — ``hermes_cli.main``, ``run_agent``, ``cli`` — consults
     this, so the updater never resolves external secret sources: on Windows they map
     ``cryptography._rust.pyd`` into the process replacing that venv, and everywhere a slow
     ``op``/``bws``/command helper (up to 120s per source) would run inside the updater's
     120s critical-module import probe and be reported as an import-health timeout.
-    Profile flags are stripped before ``hermes_cli.main`` loads dotenv, so ``argv[1]`` is
-    the authoritative subcommand.
+    Kanban list/ls/show read persisted cards without provider credentials. Keep the
+    dotenv, managed-env and config-backend layers; only external source resolution
+    is unnecessary. Other commands, including Kanban writes, retain it.
     """
-    return _UPDATE_RETRY_RECOVERED or sys.argv[1:2] == ["update"]
+    if _UPDATE_RETRY_RECOVERED or sys.argv[1:2] == ["update"]:
+        return True
+    args = command_argv(sys.argv[1:])
+    if args[:1] != ["kanban"]:
+        return False
+    args = args[1:]
+    while args and args[0].partition("=")[0] == "--board":
+        args = args[1 if "=" in args[0] else 2 :]
+    return bool(args) and args[0] in ("list", "ls", "show")
 
 
 def _project_root() -> Path:
@@ -1394,8 +1405,6 @@ def recover_if_needed(project_root: Path | None = None, argv: list[str] | None =
     root = _project_root() if project_root is None else Path(project_root).resolve()
     if not explicit and _pytest_owns_live_checkout(root):
         return False
-    from hermes_cli._parser import command_argv
-
     args = command_argv(sys.argv[1:] if argv is None else argv)
     if not explicit and args[:1] == ["pm"]:
         return False  # PM's command boundary owns the explicit repair.

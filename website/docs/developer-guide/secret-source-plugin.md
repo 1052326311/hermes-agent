@@ -26,6 +26,9 @@ That closes the "replace Bitwarden with my vault" first-process gap (#64177).
   and not in the import-health probes it spawns. Nothing in the update path
   needs credentials, and a slow helper would otherwise be misreported as an
   import failure (#110823).
+- Local Kanban card queries (`hermes kanban list`, `ls`, and `show`) also skip
+  external sources. Dotenv, administrator-managed environment values, and the
+  config backend still load; commands that create or run tasks retain source resolution.
 - Sources only supply env vars through the orchestrator; there is **no**
   plugin API to dump other plugins' or the user's entire secret store beyond
   what your source's own config allows.
